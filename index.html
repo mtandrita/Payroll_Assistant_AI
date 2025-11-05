@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Payroll Assistant Dashboard</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Custom scrollbar for chat */
+        #chat-window::-webkit-scrollbar {
+            width: 6px;
+        }
+        #chat-window::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 3px;
+        }
+        /* Style for the main container to ensure it fills the viewport */
+        .h-screen-minus-header {
+            height: calc(100vh - 64px); /* Assuming header is 64px (h-16) */
+        }
+        /* Inter font is default, but ensuring a good fallback stack */
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-indigo-700 shadow-lg p-4 text-white flex justify-between items-center h-16">
+        <h1 class="text-2xl font-bold tracking-wider">
+            <i class="fas fa-hand-holding-usd mr-2"></i>AI Payroll Manager
+        </h1>
+        <div id="auth-status" class="text-sm font-medium opacity-80 flex items-center">
+            <i class="fas fa-circle-notch fa-spin mr-2" id="loading-spinner"></i>
+            Initializing...
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow flex flex-col md:flex-row h-screen-minus-header overflow-hidden">
+
+        <!-- Payroll Dashboard (Left/Main Section) -->
+        <section class="flex-grow md:w-3/5 p-4 md:p-8 overflow-y-auto">
+            <div class="max-w-4xl mx-auto">
+                <h2 class="text-3xl font-extrabold text-gray-900 mb-6 border-b pb-2">Employee Payroll Data</h2>
+
+                <!-- Add/Edit Employee Form -->
+                <div class="bg-white p-6 rounded-xl shadow-lg mb-8 border border-indigo-100">
+                    <h3 class="text-xl font-semibold text-indigo-600 mb-4" id="form-title">Add New Employee</h3>
+                    <form id="employee-form" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <input type="hidden" id="employee-id">
+
+                        <div class="col-span-1">
+                            <label for="name" class="block text-sm font-medium text-gray-700">Name</label>
+                            <input type="text" id="name" required class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border">
+                        </div>
+                        <div class="col-span-1">
+                            <label for="hourlyRate" class="block text-sm font-medium text-gray-700">Hourly Rate ($)</label>
+                            <input type="number" id="hourlyRate" required step="0.01" min="0" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border">
+                        </div>
+                        <div class="col-span-1">
+                            <label for="hoursWorked" class="block text-sm font-medium text-gray-700">Hours Worked</label>
+                            <input type="number" id="hoursWorked" required step="0.5" min="0" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border">
+                        </div>
+                        <div class="col-span-1 flex items-end">
+                            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition ease-in-out duration-150">
+                                <i class="fas fa-save mr-2"></i>Save Employee
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Employee Table -->
+                <div class="bg-white rounded-xl shadow-lg overflow-x-auto border border-indigo-100">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-indigo-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rate</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gross Pay</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Net Pay*</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200" id="payroll-table-body">
+                            <!-- Employee rows will be dynamically inserted here -->
+                            <tr>
+                                <td colspan="6" class="p-4 text-center text-gray-500 italic">No employee data found. Add a new employee above!</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">*Net Pay is calculated as Gross Pay minus a simplified 25% for mock taxes/deductions.</p>
+            </div>
+        </section>
+
+        <!-- AI Chatbot Sidebar (Right Section) -->
+        <section class="md:w-2/5 flex flex-col bg-indigo-50 border-t md:border-t-0 md:border-l border-indigo-200 shadow-inner overflow-hidden">
+            <div class="p-4 bg-indigo-100 border-b border-indigo-200">
+                <h2 class="text-xl font-bold text-indigo-800 flex items-center">
+                    <i class="fas fa-robot mr-2"></i>AI Payroll Expert
+                </h2>
+                <p class="text-sm text-indigo-600">Ask questions about payroll regulations, taxes, or general finance.</p>
+            </div>
+
+            <!-- Chat Window -->
+            <div id="chat-window" class="flex-grow p-4 space-y-4 overflow-y-auto">
+                <!-- Initial Bot Message -->
+                <div class="flex justify-start">
+                    <div class="bg-white text-gray-800 p-3 rounded-xl rounded-tl-none shadow max-w-xs md:max-w-md">
+                        <p>Hello! I am your AI Payroll Expert. I can help you with general payroll, tax, or finance questions. Ask me anything!</p>
+                    </div>
+                </div>
+                <!-- Chat messages will be dynamically inserted here -->
+            </div>
+
+            <!-- Chat Input Form -->
+            <form id="chat-form" class="p-4 bg-white border-t border-gray-200 flex">
+                <input type="text" id="chat-input" placeholder="Type your question here..." required class="flex-grow rounded-l-lg border border-gray-300 p-3 focus:ring-indigo-500 focus:border-indigo-500">
+                <button type="submit" id="chat-send-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-r-lg shadow-md transition ease-in-out duration-150 flex items-center justify-center disabled:opacity-50" disabled>
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </form>
+        </section>
+    </main>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, query, where, getDocs, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- GLOBAL VARIABLES & FIREBASE SETUP ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'payroll-assistant-default-app';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let app, db, auth, userId = null;
+        let employees = []; // Local state for employee data
+        let chatMessages = []; // Local state for chat history
+
+        const employeeForm = document.getElementById('employee-form');
+        const payrollTableBody = document.getElementById('payroll-table-body');
+        const chatForm = document.getElementById('chat-form');
+        const chatWindow = document.getElementById('chat-window');
+        const chatInput = document.getElementById('chat-input');
+        const chatSendBtn = document.getElementById('chat-send-btn');
+        const authStatusElement = document.getElementById('auth-status');
+        const loadingSpinner = document.getElementById('loading-spinner');
+
+        // Set Firebase logging level (optional, but good practice)
+        setLogLevel('error');
+
+        /**
+         * Initializes Firebase App, Authentication, and Firestore.
+         */
+        async function initFirebase() {
+            try {
+                if (Object.keys(firebaseConfig).length === 0) {
+                    throw new Error("Firebase configuration is missing.");
+                }
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Authentication
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        authStatusElement.innerHTML = `<i class="fas fa-user-circle mr-1"></i> User ID: ${userId.substring(0, 8)}...`;
+                        chatSendBtn.disabled = false; // Enable chatbot once authorized
+                        setupFirestoreListener(); // Start listening for data
+                    } else {
+                        // Attempt silent authentication
+                        await (initialAuthToken ? signInWithCustomToken(auth, initialAuthToken) : signInAnonymously(auth));
+                    }
+                });
+            } catch (error) {
+                console.error("Firebase Initialization Error:", error);
+                authStatusElement.innerHTML = '<i class="fas fa-exclamation-triangle mr-1 text-red-500"></i> Auth Failed';
+                loadingSpinner.style.display = 'none';
+            }
+        }
+
+        /**
+         * Returns the full collection path for payroll data.
+         * @returns {string}
+         */
+        function getCollectionPath() {
+            if (!userId) {
+                console.error("User not authenticated.");
+                return null;
+            }
+            // Private data storage path
+            return `/artifacts/${appId}/users/${userId}/payroll_data`;
+        }
+
+        /**
+         * Sets up real-time listener for employee data.
+         */
+        function setupFirestoreListener() {
+            const collectionPath = getCollectionPath();
+            if (!collectionPath) return;
+
+            const q = collection(db, collectionPath);
+
+            onSnapshot(q, (snapshot) => {
+                const changes = snapshot.docChanges();
+                if (changes.length > 0) {
+                    employees = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    employees.sort((a, b) => (a.name || "").localeCompare(b.name || "")); // Sort by name
+                    renderPayroll();
+                } else if (snapshot.empty) {
+                    employees = [];
+                    renderPayroll();
+                }
+            }, (error) => {
+                console.error("Firestore Listener Error:", error);
+            });
+        }
+
+        /**
+         * Calculates Gross Pay and Net Pay (Gross Pay - 25% mock deduction).
+         * @param {Object} employee - Employee object with hourlyRate and hoursWorked.
+         * @returns {Object} Updated employee object with grossPay and netPay.
+         */
+        function calculatePay(employee) {
+            const rate = parseFloat(employee.hourlyRate) || 0;
+            const hours = parseFloat(employee.hoursWorked) || 0;
+            const grossPay = rate * hours;
+            const deductionRate = 0.25; // Mock 25% deduction for taxes/benefits
+            const netPay = grossPay * (1 - deductionRate);
+
+            return {
+                ...employee,
+                grossPay: parseFloat(grossPay.toFixed(2)),
+                deductions: parseFloat((grossPay * deductionRate).toFixed(2)),
+                netPay: parseFloat(netPay.toFixed(2))
+            };
+        }
+
+        /**
+         * Handles form submission for adding or updating an employee.
+         */
+        employeeForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!userId) {
+                console.error("Authentication required to save data.");
+                return;
+            }
+
+            const id = document.getElementById('employee-id').value;
+            const name = document.getElementById('name').value.trim();
+            const hourlyRate = parseFloat(document.getElementById('hourlyRate').value);
+            const hoursWorked = parseFloat(document.getElementById('hoursWorked').value);
+
+            if (!name || isNaN(hourlyRate) || isNaN(hoursWorked)) return;
+
+            let employeeData = { name, hourlyRate, hoursWorked, createdAt: serverTimestamp() };
+            employeeData = calculatePay(employeeData);
+
+            try {
+                const collectionPath = getCollectionPath();
+                if (!collectionPath) return;
+
+                if (id) {
+                    // Update existing document
+                    const docRef = doc(db, collectionPath, id);
+                    await updateDoc(docRef, employeeData);
+                } else {
+                    // Add new document
+                    await addDoc(collection(db, collectionPath), employeeData);
+                }
+
+                // Reset form
+                employeeForm.reset();
+                document.getElementById('employee-id').value = '';
+                document.getElementById('form-title').textContent = 'Add New Employee';
+            } catch (error) {
+                console.error("Error saving employee data:", error);
+            }
+        });
+
+        /**
+         * Fills the form for editing an existing employee.
+         * @param {string} id - The ID of the employee document.
+         */
+        function editEmployee(id) {
+            const employee = employees.find(e => e.id === id);
+            if (employee) {
+                document.getElementById('employee-id').value = employee.id;
+                document.getElementById('name').value = employee.name;
+                document.getElementById('hourlyRate').value = employee.hourlyRate;
+                document.getElementById('hoursWorked').value = employee.hoursWorked;
+                document.getElementById('form-title').textContent = 'Edit Employee: ' + employee.name;
+            }
+        }
+
+        /**
+         * Deletes an employee document from Firestore.
+         * @param {string} id - The ID of the employee document.
+         */
+        async function deleteEmployee(id) {
+            if (!userId) return;
+            if (confirm("Are you sure you want to delete this employee's payroll record?")) {
+                try {
+                    const collectionPath = getCollectionPath();
+                    if (!collectionPath) return;
+
+                    const docRef = doc(db, collectionPath, id);
+                    await deleteDoc(docRef);
+                } catch (error) {
+                    console.error("Error deleting employee:", error);
+                }
+            }
+        }
+
+        /**
+         * Renders the employee data table.
+         */
+        function renderPayroll() {
+            payrollTableBody.innerHTML = '';
+
+            if (employees.length === 0) {
+                payrollTableBody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-gray-500 italic">No employee data found. Add a new employee above!</td></tr>`;
+                return;
+            }
+
+            employees.forEach(employee => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-indigo-50 transition duration-100';
+
+                // Format currency
+                const formatCurrency = (value) => `$${value.toFixed(2)}`;
+
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${employee.name}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatCurrency(employee.hourlyRate)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${employee.hoursWorked}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-700">${formatCurrency(employee.grossPay)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-indigo-600">${formatCurrency(employee.netPay)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button onclick="editEmployee('${employee.id}')" class="text-indigo-600 hover:text-indigo-900 mr-3 transition duration-150">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <button onclick="deleteEmployee('${employee.id}')" class="text-red-600 hover:text-red-900 transition duration-150">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </td>
+                `;
+                payrollTableBody.appendChild(row);
+            });
+
+            // Make functions globally accessible for inline onclick handlers
+            window.editEmployee = editEmployee;
+            window.deleteEmployee = deleteEmployee;
+        }
+
+        // --- GEMINI CHATBOT LOGIC ---
+
+        const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=";
+        const apiKey = ""; // Canvas will provide this
+
+        /**
+         * Displays a new message in the chat window.
+         * @param {string} text - The message content.
+         * @param {string} sender - 'user' or 'bot'.
+         * @param {Array<Object>} [sources=[]] - Array of citation sources for bot messages.
+         */
+        function displayMessage(text, sender, sources = []) {
+            const isBot = sender === 'bot';
+            const messageWrapper = document.createElement('div');
+            messageWrapper.className = `flex ${isBot ? 'justify-start' : 'justify-end'}`;
+
+            const messageBubble = document.createElement('div');
+            messageBubble.className = `p-3 rounded-xl shadow max-w-xs md:max-w-md ${isBot
+                ? 'bg-white text-gray-800 rounded-tl-none border border-indigo-200'
+                : 'bg-indigo-600 text-white rounded-tr-none'}`;
+
+            // Convert Markdown to basic HTML (bold, italic, links, lists)
+            let formattedText = text;
+            formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            formattedText = formattedText.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            formattedText = formattedText.replace(/\n/g, '<br>');
+
+            messageBubble.innerHTML = formattedText;
+
+            // Add sources if available
+            if (isBot && sources.length > 0) {
+                const sourcesContainer = document.createElement('div');
+                sourcesContainer.className = 'mt-2 pt-2 border-t border-gray-100 text-xs text-gray-500 italic';
+                sourcesContainer.innerHTML = '<strong>Sources:</strong> ' + sources.map(s =>
+                    `<a href="${s.uri}" target="_blank" class="hover:underline text-indigo-500">${s.title || s.uri}</a>`
+                ).join(' | ');
+                messageBubble.appendChild(sourcesContainer);
+            }
+
+            messageWrapper.appendChild(messageBubble);
+            chatWindow.appendChild(messageWrapper);
+
+            // Scroll to the bottom
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        /**
+         * Fetches response from Gemini API with Google Search grounding and retry logic.
+         * @param {string} userQuery - The user's input query.
+         * @returns {Promise<Object|null>} - Generated text and sources, or null on failure.
+         */
+        async function fetchChatResponse(userQuery) {
+            const systemPrompt = "You are a friendly and knowledgeable AI Payroll and Finance Expert. Keep your answers concise, informative, and professional. Use the Google Search tool for factual or current-event questions. Respond only in plain text format.";
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                tools: [{ "google_search": {} }],
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+            };
+
+            const url = GEMINI_API_URL + apiKey;
+            const MAX_RETRIES = 5;
+            let delay = 1000;
+
+            for (let i = 0; i < MAX_RETRIES; i++) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        const result = await response.json();
+                        const candidate = result.candidates?.[0];
+
+                        if (candidate && candidate.content?.parts?.[0]?.text) {
+                            const text = candidate.content.parts[0].text;
+                            let sources = [];
+                            const groundingMetadata = candidate.groundingMetadata;
+                            if (groundingMetadata && groundingMetadata.groundingAttributions) {
+                                sources = groundingMetadata.groundingAttributions
+                                    .map(attribution => ({
+                                        uri: attribution.web?.uri,
+                                        title: attribution.web?.title,
+                                    }))
+                                    .filter(source => source.uri && source.title);
+                            }
+                            return { text, sources };
+                        }
+                    } else if (response.status === 429) {
+                        // Rate limit error, retry
+                        if (i < MAX_RETRIES - 1) {
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            delay *= 2; // Exponential backoff
+                            continue;
+                        }
+                    } else {
+                        // Other HTTP error
+                        console.error("API error:", response.status, await response.text());
+                    }
+                    return null;
+                } catch (error) {
+                    console.error("Fetch error:", error);
+                    return null;
+                }
+            }
+            return null; // Failed after all retries
+        }
+
+        /**
+         * Handles chat form submission.
+         */
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const userQuery = chatInput.value.trim();
+            if (!userQuery || chatSendBtn.disabled) return;
+
+            // 1. Display user message
+            displayMessage(userQuery, 'user');
+            chatInput.value = '';
+            chatSendBtn.disabled = true;
+
+            // 2. Add loading indicator
+            const loadingWrapper = document.createElement('div');
+            loadingWrapper.className = 'flex justify-start';
+            loadingWrapper.innerHTML = `
+                <div class="bg-white text-gray-500 p-3 rounded-xl rounded-tl-none shadow max-w-xs md:max-w-md border border-indigo-200">
+                    <i class="fas fa-ellipsis-h fa-beat mr-2"></i> Thinking...
+                </div>
+            `;
+            chatWindow.appendChild(loadingWrapper);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+
+            // 3. Fetch response
+            const result = await fetchChatResponse(userQuery);
+
+            // 4. Remove loading indicator
+            chatWindow.removeChild(loadingWrapper);
+
+            // 5. Display bot response or error
+            if (result) {
+                displayMessage(result.text, 'bot', result.sources);
+            } else {
+                displayMessage('Sorry, I am currently unable to fetch a response. Please try again later.', 'bot');
+            }
+
+            chatSendBtn.disabled = false;
+        });
+
+        // --- INITIALIZATION ---
+        window.onload = initFirebase;
+    </script>
+</body>
+</html>
